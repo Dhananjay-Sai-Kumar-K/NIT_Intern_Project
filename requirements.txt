@@ -1,0 +1,9 @@
+pandas
+pyarrow
+PyYAML
+pytest
+geopandas
+shapely
+scikit-learn
+xgboost
+matplotlib

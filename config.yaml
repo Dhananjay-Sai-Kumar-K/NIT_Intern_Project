@@ -1,0 +1,120 @@
+input:
+  ais_csv_paths:
+    - data/raw/ais/*.csv
+  eez_shapefile_path: data/raw/eez/eez.shp
+  gfw_fishing_effort_path: data/raw/gfw/fishing_effort.csv
+  gfw_fishing_labels_path: data/processed/gfw_fishing_labels.parquet
+
+output:
+  cleaned_ais_path: data/processed/cleaned_ais.parquet
+  segments_path: data/processed/segments.parquet
+  boundary_events_path: data/processed/boundary_events.parquet
+  event_sequence_path: data/processed/event_sequence.json
+  features_path: data/processed/features.parquet
+  situation_labels_path: data/processed/situation_labels.parquet
+  best_model_path: models/best_model.pkl
+  metrics_path: models/metrics.json
+  confusion_matrix_path: models/confusion_matrix.png
+  reasoned_situations_path: data/processed/reasoned_situations.json
+  statistics_path: data/processed/dataset_statistics.json
+
+schema:
+  required_columns:
+    - MMSI
+    - timestamp
+    - latitude
+    - longitude
+    - speed
+    - heading
+  column_aliases:
+    MMSI:
+      - mmsi
+      - vessel_id
+      - vesselid
+    timestamp:
+      - timestamp
+      - time
+      - datetime
+      - basedatetime
+      - date_time_utc
+    latitude:
+      - latitude
+      - lat
+    longitude:
+      - longitude
+      - lon
+      - long
+      - lng
+    speed:
+      - speed
+      - sog
+      - speed_over_ground
+    heading:
+      - heading
+      - cog
+      - course
+      - course_over_ground
+
+cleaning:
+  latitude_range: [-90, 90]
+  longitude_range: [-180, 180]
+  duplicate_subset:
+    - MMSI
+    - timestamp
+
+segmentation:
+  window_minutes:
+    - 30
+    - 60
+  min_points: 10
+
+geofencing:
+  batch_size: 250000
+
+event_extraction:
+  anchor_speed_knots: 0.5
+  anchor_min_duration_minutes: 60
+  loiter_speed_knots: 2.0
+  loiter_radius_km: 2.0
+  loiter_min_duration_minutes: 120
+  max_ais_gap_minutes: 30
+  maneuver_window_minutes: 30
+  maneuver_min_points: 10
+  maneuver_min_point_coverage_ratio: 0.5
+  maneuver_heading_circular_variance_threshold: 0.5
+  repeated_crossing_count: 3
+  repeated_crossing_window_hours: 24
+
+weak_supervision:
+  transit_min_avg_speed: 5.0
+  transit_max_speed_variance: 4.0
+  transit_max_trajectory_curvature: 2.5
+  anchorage_min_anchor_duration_minutes: 20.0
+  boundary_crossing_min_crossings: 2
+  prolonged_boundary_max_distance_km: 5.0
+  prolonged_boundary_min_loiter_duration_minutes: 20.0
+  fishing_confidence: 0.95
+  anchorage_confidence: 0.9
+  prolonged_boundary_confidence: 0.85
+  boundary_crossing_confidence: 0.8
+  transit_confidence: 0.75
+  unknown_confidence: 0.25
+
+gfw:
+  min_fishing_hours: 0.1
+
+classifier_training:
+  test_size: 0.15
+  validation_size: 0.15
+  n_jobs: 1
+
+situation_reasoning:
+  transit_max_trip_hours: 12.0
+  prolonged_presence_min_loiter_events: 1
+  anchorage_min_duration_minutes: 60.0
+  repeated_crossing_base_confidence: 0.9
+  boundary_crossing_confidence: 0.75
+  transit_confidence: 0.7
+  anchorage_confidence: 0.9
+  prolonged_presence_confidence: 0.85
+  maneuvering_confidence: 0.65
