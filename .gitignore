@@ -2,3 +2,16 @@ _pycache_/
 data/
 models/
 tests/
+compression_vs_error.png
+confusion_matrix_situation.png
+confusion_matrix.png
+evaluation_report.md
+interactive_map.html
+metrics.json
+paper_tables.tex
+paper_tables.csv
+performance_benchmark.png
+REAL_DATA_STEPS.md
+reasoning_improvement.png
+results_summary.md
+trajectory_comparison.png
