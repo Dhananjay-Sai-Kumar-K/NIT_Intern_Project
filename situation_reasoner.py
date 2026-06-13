@@ -173,7 +173,9 @@ class ProlongedBoundaryPresenceRule:
                 vessel_events.iloc[entry_index],
                 *[row for row in loiter_events.itertuples(index=False)],
             ]
-            if exit_index is not None and exit_index < search_end:
+            if exit_index is not None and (
+                next_entry_index is None or exit_index < next_entry_index
+            ):
                 support.append(vessel_events.iloc[exit_index])
                 
             rows.append(
