@@ -7,7 +7,7 @@ from typing import Any
 
 import pandas as pd
 import yaml
-
+import json
 
 REQUIRED_FEATURE_COLUMNS = [
     "segment_id",
@@ -122,7 +122,16 @@ def generate_situation_labels(
 def write_situation_labels(labels: pd.DataFrame, output_path: str | Path) -> None:
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
+
+    labels = labels.copy()
+
+    if "rule_details" in labels.columns:
+        labels["rule_details"] = labels["rule_details"].apply(
+            lambda x: json.dumps(x) if isinstance(x, dict) else str(x)
+        )
+
     labels.to_parquet(path, engine="pyarrow", index=False)
+    print(labels["situation_label"].value_counts())
 
 
 def main(config_path: str | Path = "config.yaml") -> None:

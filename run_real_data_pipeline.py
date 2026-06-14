@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from data_loader import build_dataset
-from segmenter import build_segments
+from data_loader import build_dataset, build_dataset_chunked
+from segmenter import build_segments, build_segments_by_date
 
 
 DEFAULT_RAW_DIR = Path("data/raw/ais")
@@ -44,23 +44,42 @@ def main() -> None:
         segments_out = segments_out.parent / f"{suffix_stem}_{segments_out.name}"
         stats_out = stats_out.parent / f"{suffix_stem}_{stats_out.name}"
 
-    cleaned, trajectories, stats = build_dataset(
-        csv_paths=staged_csv_paths,
-        cleaned_output_path=cleaned_out,
-        statistics_output_path=stats_out,
-        column_aliases=_real_ais_column_aliases(),
-    )
-    
-    print(f"Cleaned AIS rows: {len(cleaned)}")
+    if len(staged_csv_paths) > 1:
+        stats = build_dataset_chunked(
+            csv_paths=staged_csv_paths,
+            cleaned_output_path=cleaned_out,
+            statistics_output_path=stats_out,
+            column_aliases=_real_ais_column_aliases(),
+            chunksize=args.chunksize,
+        )
+        print(f"Cleaned AIS rows: {stats.cleaned_rows}")
+        print(f"Vessel trajectories: {stats.vessel_count}")
+    else:
+        cleaned, trajectories, stats = build_dataset(
+            csv_paths=staged_csv_paths,
+            cleaned_output_path=cleaned_out,
+            statistics_output_path=stats_out,
+            column_aliases=_real_ais_column_aliases(),
+        )
+        print(f"Cleaned AIS rows: {len(cleaned)}")
+        print(f"Vessel trajectories: {len(trajectories)}")
     print(f"Wrote: {cleaned_out}")
 
-    segments = build_segments(
-        cleaned_ais_path=cleaned_out,
-        segments_output_path=segments_out,
-        window_minutes=args.window_minutes,
-        min_points=args.min_points,
-    )
-    segment_count = segments["segment_id"].nunique() if not segments.empty else 0
+    if len(staged_csv_paths) > 1:
+        segment_count = build_segments_by_date(
+            cleaned_ais_path=cleaned_out,
+            segments_output_path=segments_out,
+            window_minutes=args.window_minutes,
+            min_points=args.min_points,
+        )
+    else:
+        segments = build_segments(
+            cleaned_ais_path=cleaned_out,
+            segments_output_path=segments_out,
+            window_minutes=args.window_minutes,
+            min_points=args.min_points,
+        )
+        segment_count = segments["segment_id"].nunique() if not segments.empty else 0
     print(f"Segments: {segment_count}")
     print(f"Wrote: {segments_out}")
 
@@ -122,6 +141,12 @@ def parse_args() -> argparse.Namespace:
         "--replace-raw",
         action="store_true",
         help="Delete existing staged CSV files in the raw directory before staging.",
+    )
+    parser.add_argument(
+        "--chunksize",
+        type=int,
+        default=1_000_000,
+        help="CSV rows per chunk for memory-safe multi-file ingestion.",
     )
     return parser.parse_args()
 

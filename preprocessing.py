@@ -95,12 +95,14 @@ def clean_ais_dataframe(dataframe: pd.DataFrame) -> tuple[pd.DataFrame, Cleaning
     raw_rows = len(dataframe)
     cleaned = dataframe.copy()
 
-    cleaned["timestamp"] = pd.to_datetime(cleaned["timestamp"], errors="coerce", utc=True)
+    # Use dayfirst=True to correctly parse European date formats (e.g. DD/MM/YYYY)
+    cleaned["timestamp"] = pd.to_datetime(cleaned["timestamp"], errors="coerce", utc=True, dayfirst=True)
     for column in ["MMSI", "latitude", "longitude", "speed", "heading"]:
         cleaned[column] = pd.to_numeric(cleaned[column], errors="coerce")
 
     cleaned = cleaned.dropna(subset=["MMSI", "timestamp", "latitude", "longitude"])
     cleaned["MMSI"] = cleaned["MMSI"].astype("int64")
+    cleaned["trajectory_date"] = cleaned["timestamp"].dt.strftime("%Y-%m-%d")
 
     valid_coordinates = cleaned["latitude"].between(-90, 90) & cleaned["longitude"].between(
         -180, 180
@@ -112,7 +114,13 @@ def clean_ais_dataframe(dataframe: pd.DataFrame) -> tuple[pd.DataFrame, Cleaning
     cleaned = cleaned.drop_duplicates(subset=["MMSI", "timestamp"], keep="first")
     duplicate_timestamp_rows = before_deduplication - len(cleaned)
 
-    cleaned = cleaned.sort_values(["MMSI", "timestamp"]).reset_index(drop=True)
+    # Filter out AIS shore-based base stations and repeaters.
+    # These have MMSI values in the 992xxxxxx range and do not move,
+    # so their speed is always NaN/0, which corrupts the feature pipeline.
+    is_base_station = (cleaned["MMSI"] >= 992_000_000) & (cleaned["MMSI"] <= 992_999_999)
+    cleaned = cleaned.loc[~is_base_station].copy()
+
+    cleaned = cleaned.sort_values(["MMSI", "trajectory_date", "timestamp"]).reset_index(drop=True)
 
     stats = CleaningStats(
         raw_rows=raw_rows,

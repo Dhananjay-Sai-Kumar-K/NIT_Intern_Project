@@ -1,22 +1,23 @@
 input:
   ais_csv_paths:
     - data/raw/ais/*.csv
-  eez_shapefile_path: data/raw/eez/eez.shp
+  eez_shapefile_path: data/raw/eez/World_EEZ_v12_20231025/World_EEZ_v12_20231025/eez_v12.shp
   gfw_fishing_effort_path: data/raw/gfw/fishing_effort.csv
   gfw_fishing_labels_path: data/processed/gfw_fishing_labels.parquet
 
 output:
-  cleaned_ais_path: data/processed/cleaned_ais.parquet
+  cleaned_ais_path: data/processed/aisdk-2024-03-01_cleaned_ais.parquet
   segments_path: data/processed/segments.parquet
-  boundary_events_path: data/processed/boundary_events.parquet
-  event_sequence_path: data/processed/event_sequence.json
-  features_path: data/processed/features.parquet
-  situation_labels_path: data/processed/situation_labels.parquet
+  boundary_events_path: data/processed/aisdk-2024-03-01_boundary_events.parquet
+  event_sequence_path: data/processed/aisdk-2024-03-01_event_sequence.json
+  features_path: data/processed/aisdk-2024-03-01_features.parquet
+  situation_labels_path: data/processed/aisdk-2024-03-01_situation_labels.parquet
   best_model_path: models/best_model.pkl
   metrics_path: models/metrics.json
   confusion_matrix_path: models/confusion_matrix.png
   reasoned_situations_path: data/processed/reasoned_situations.json
   statistics_path: data/processed/dataset_statistics.json
+
 
 schema:
   required_columns:
@@ -118,3 +119,6 @@ situation_reasoning:
   anchorage_confidence: 0.9
   prolonged_presence_confidence: 0.85
   maneuvering_confidence: 0.65
+
+classifier_training:
+  max_majority_samples: 15000
