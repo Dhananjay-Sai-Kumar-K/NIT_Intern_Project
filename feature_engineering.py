@@ -226,6 +226,12 @@ def calculate_segment_features(
         "path_length",
         "displacement",
         "trajectory_curvature",
+        "path_tortuosity",
+        "heading_variance",
+        "mean_heading_change",
+        "loop_count",
+        "turn_density",
+        "stationary_ratio",
         "crossing_count",
         "distance_to_boundary",
         "anchor_duration",
@@ -402,6 +408,13 @@ def _calculate_motion_and_spatial_features(segments: pd.DataFrame) -> pd.DataFra
     )
     ordered["_speed_squared"] = ordered["speed"] ** 2
 
+    # New Features
+    ordered["_heading_change"] = ordered["heading"].diff().abs()
+    ordered["_heading_change"] = np.minimum(ordered["_heading_change"], 360 - ordered["_heading_change"])
+    ordered.loc[~step_mask, "_heading_change"] = np.nan # Only diff within same segment
+    ordered["_is_stationary"] = ordered["speed"] < 1.0
+    ordered["_is_significant_turn"] = ordered["_heading_change"] > 30.0
+
     grouped = ordered.groupby("segment_id", sort=False)
     features = grouped.agg(
         mmsi=("MMSI", "first"),
@@ -415,6 +428,11 @@ def _calculate_motion_and_spatial_features(segments: pd.DataFrame) -> pd.DataFra
         max_speed=("speed", "max"),
         speed_squared_mean=("_speed_squared", "mean"),
         path_length=("_step_distance_km", "sum"),
+        heading_variance=("heading", "var"),
+        mean_heading_change=("_heading_change", "mean"),
+        total_heading_change=("_heading_change", "sum"),
+        significant_turn_count=("_is_significant_turn", "sum"),
+        stationary_ratio=("_is_stationary", "mean"),
         centroid_latitude=("latitude", "mean"),
         centroid_longitude=("longitude", "mean"),
         start_latitude=("latitude", "first"),
@@ -440,8 +458,28 @@ def _calculate_motion_and_spatial_features(segments: pd.DataFrame) -> pd.DataFra
         features["path_length"] / features["displacement"],
         0.0,
     )
+    features["path_tortuosity"] = features["trajectory_curvature"]
+    features["loop_count"] = features["total_heading_change"] / 360.0
+    features["turn_density"] = np.where(
+        features["path_length"] > 0, 
+        features["significant_turn_count"] / features["path_length"], 
+        0.0
+    )
     features["mmsi"] = features["mmsi"].astype("int64")
     features["number_of_points"] = features["number_of_points"].astype("int64")
+
+    # --- Fallback: if AIS-reported speed is entirely missing (all NaN), derive
+    # avg_speed from the GPS-computed path_length and segment duration.
+    # 1 knot = 1.852 km/h.  path_length is in km, duration_seconds in seconds.
+    # Formula: speed_knots = (path_length_km / duration_seconds) * 3600 / 1.852
+    if features["avg_speed"].isna().all():
+        safe_duration = features["duration_seconds"].replace(0, np.nan)
+        features["avg_speed"] = (
+            features["path_length"] / safe_duration * 3600.0 / 1.852
+        ).fillna(0.0)
+        features["max_speed"] = features["avg_speed"]  # best estimate available
+        # Variance is unknown when speed is derived from positions only
+        features["speed_variance"] = 0.0
 
     return features.drop(
         columns=[
